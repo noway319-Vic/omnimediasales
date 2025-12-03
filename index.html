@@ -7,35 +7,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-      /* Custom scrollbar for cleaner look */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
-      }
-      /* Animation for notifications */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
+      ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
       @keyframes fadeInDown {
-        from {
-          opacity: 0;
-          transform: translate3d(0, -20px, 0);
-        }
-        to {
-          opacity: 1;
-          transform: translate3d(0, 0, 0);
-        }
+        from { opacity: 0; transform: translate3d(0, -20px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
       }
-      .animate-fade-in-down {
-        animation: fadeInDown 0.3s ease-out;
-      }
+      .animate-fade-in-down { animation: fadeInDown 0.3s ease-out; }
     </style>
     <script type="importmap">
 {
@@ -43,19 +23,6 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "./App": "./App.tsx",
-    "./types": "./types.ts",
-    "./services/geminiService": "./services/geminiService.ts",
-    "./contexts/DataContext": "./contexts/DataContext.tsx",
-    "./components/Login": "./components/Login.tsx",
-    "./components/Layout": "./components/Layout.tsx",
-    "./components/Dashboard": "./components/Dashboard.tsx",
-    "./components/RequestForm": "./components/RequestForm.tsx",
-    "./components/AdminPanel": "./components/AdminPanel.tsx",
-    "./components/Settings": "./components/Settings.tsx",
-    "../types": "./types.ts",
-    "../contexts/DataContext": "./contexts/DataContext.tsx",
-    "../services/geminiService": "./services/geminiService.ts",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
@@ -68,6 +35,7 @@
       // Polyfill process for geminiService safety
       window.process = window.process || { env: {} };
     </script>
-    <script type="text/babel" data-presets="react,typescript" data-type="module" src="index.tsx"></script>
+    <!-- Load the main application script -->
+    <script type="text/babel" data-presets="react,typescript" src="index.tsx"></script>
   </body>
 </html>

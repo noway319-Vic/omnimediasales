@@ -11,16 +11,6 @@
   "dependencies": {
     "react": "^19.2.0",
     "@google/genai": "^1.30.0",
-    "./App": "latest",
-    "./types": "latest",
-    "./services/geminiService": "latest",
-    "./contexts/DataContext": "latest",
-    "./components/Login": "latest",
-    "./components/Layout": "latest",
-    "./components/Dashboard": "latest",
-    "./components/RequestForm": "latest",
-    "./components/AdminPanel": "latest",
-    "./components/Settings": "latest",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
