@@ -1,0 +1,63 @@
+import React, { useState } from 'react';
+import { useData } from '../contexts/DataContext';
+
+const Login: React.FC = () => {
+  const { login, showNotification } = useData();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const success = login(username, password);
+    if (!success) {
+      showNotification('帳號或密碼錯誤', 'error');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold text-slate-800">專案行銷請假系統</h1>
+          <p className="text-slate-500 mt-2">高效管理您的加班與補休</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">帳號</label>
+            <input
+              type="text"
+              required
+              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="輸入帳號"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">密碼</label>
+            <input
+              type="password"
+              required
+              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="輸入密碼"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transform active:scale-95 transition duration-200"
+          >
+            登入
+          </button>
+        </form>
+        <div className="mt-6 text-center text-xs text-slate-400">
+          <p>預設管理員帳號: admin / admin123</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
