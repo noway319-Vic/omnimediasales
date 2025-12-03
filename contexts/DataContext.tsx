@@ -11,7 +11,8 @@ interface DataContextType {
   addUser: (user: Omit<User, 'id' | 'compTimeBalance'>) => void;
   deleteUser: (id: string) => void;
   updatePassword: (id: string, newPass: string) => void;
-  submitRequest: (req: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username'>) => void;
+  // Added userId to Omit list as it is derived from currentUser
+  submitRequest: (req: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username' | 'userId'>) => void;
   processRequest: (requestId: string, status: RequestStatus.APPROVED | RequestStatus.REJECTED) => void;
   showNotification: (msg: string, type: 'success' | 'error') => void;
 }
@@ -26,6 +27,19 @@ const SEED_ADMIN: User = {
   compTimeBalance: 0,
 };
 
+// Helper to safely parse JSON
+const safeJsonParse = (key: string, fallback: any) => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch (e) {
+    console.error(`Error parsing ${key} from localStorage`, e);
+    // If error, clear the corrupted data to prevent future crashes
+    localStorage.removeItem(key);
+    return fallback;
+  }
+};
+
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [requests, setRequests] = useState<WorkRequest[]>([]);
@@ -34,30 +48,38 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Load initial data
   useEffect(() => {
-    const storedUsers = localStorage.getItem('app_users');
-    const storedRequests = localStorage.getItem('app_requests');
-    const storedSession = localStorage.getItem('app_session');
+    const loadedUsers = safeJsonParse('app_users', null);
+    const loadedRequests = safeJsonParse('app_requests', []);
+    const loadedSession = safeJsonParse('app_session', null);
 
-    if (storedUsers) {
-      setUsers(JSON.parse(storedUsers));
+    if (loadedUsers && Array.isArray(loadedUsers) && loadedUsers.length > 0) {
+      setUsers(loadedUsers);
     } else {
       setUsers([SEED_ADMIN]);
       localStorage.setItem('app_users', JSON.stringify([SEED_ADMIN]));
     }
 
-    if (storedRequests) setRequests(JSON.parse(storedRequests));
+    if (loadedRequests && Array.isArray(loadedRequests)) {
+      setRequests(loadedRequests);
+    }
     
-    if (storedSession && storedUsers) {
-        const sessionUser = JSON.parse(storedSession);
-        const allUsers = storedUsers ? JSON.parse(storedUsers) : [SEED_ADMIN];
-        const validUser = allUsers.find((u: User) => u.id === sessionUser.id);
-        if (validUser) setCurrentUser(validUser);
+    if (loadedSession && loadedUsers) {
+        // Validate session against current users
+        const allUsers = loadedUsers || [SEED_ADMIN];
+        const validUser = allUsers.find((u: User) => u.id === loadedSession.id);
+        if (validUser) {
+            setCurrentUser(validUser);
+        } else {
+            localStorage.removeItem('app_session');
+        }
     }
   }, []);
 
   // Sync to local storage
   useEffect(() => {
-    if (users.length > 0) localStorage.setItem('app_users', JSON.stringify(users));
+    if (users.length > 0) {
+        localStorage.setItem('app_users', JSON.stringify(users));
+    }
   }, [users]);
 
   useEffect(() => {
@@ -93,6 +115,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('app_session');
   };
 
   const addUser = (userData: Omit<User, 'id' | 'compTimeBalance'>) => {
@@ -119,7 +142,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     showNotification('密碼更新成功', 'success');
   };
 
-  const submitRequest = (reqData: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username'>) => {
+  // Added userId to Omit list
+  const submitRequest = (reqData: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username' | 'userId'>) => {
     if (!currentUser) return;
 
     // Business Logic: Weekend Rule

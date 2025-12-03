@@ -1,8 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 
 const getAiClient = () => {
-  // 安全檢查：確保 process 存在，避免在某些瀏覽器環境下直接存取 process.env 導致報錯白畫面
-  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+  let apiKey = '';
+  try {
+    // Robust check for process.env
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      apiKey = process.env.API_KEY;
+    }
+  } catch (e) {
+    console.warn("Could not access process.env", e);
+  }
+
   if (!apiKey) return null;
   return new GoogleGenAI({ apiKey });
 };
