@@ -1,14 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  // 安全檢查：確保 process 存在，避免在某些瀏覽器環境下直接存取 process.env 導致報錯白畫面
+  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
   if (!apiKey) return null;
   return new GoogleGenAI({ apiKey });
 };
 
 export const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): Promise<string> => {
   const ai = getAiClient();
-  if (!ai) throw new Error("API Key missing");
+  if (!ai) {
+      console.warn("API Key missing or client not initialized");
+      return input;
+  }
 
   const typeText = type === 'OVERTIME' ? '加班' : '補休';
 
