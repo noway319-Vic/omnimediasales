@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>專案行銷請假系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
       /* Custom scrollbar for cleaner look */
       ::-webkit-scrollbar {
@@ -37,19 +38,36 @@
       }
     </style>
     <script type="importmap">
-    {
-      "imports": {
-        "react": "https://aistudiocdn.com/react@^19.2.0",
-        "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
-        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-        "react/": "https://aistudiocdn.com/react@^19.2.0/",
-        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
-      }
-    }
-    </script>
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "./App": "./App.tsx",
+    "./types": "./types.ts",
+    "./services/geminiService": "./services/geminiService.ts",
+    "./contexts/DataContext": "./contexts/DataContext.tsx",
+    "./components/Login": "./components/Login.tsx",
+    "./components/Layout": "./components/Layout.tsx",
+    "./components/Dashboard": "./components/Dashboard.tsx",
+    "./components/RequestForm": "./components/RequestForm.tsx",
+    "./components/AdminPanel": "./components/AdminPanel.tsx",
+    "./components/Settings": "./components/Settings.tsx",
+    "../types": "./types.ts",
+    "../contexts/DataContext": "./contexts/DataContext.tsx",
+    "../services/geminiService": "./services/geminiService.ts",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
-    <script type="module" src="index.tsx"></script>
+    <script>
+      // Polyfill process for geminiService safety
+      window.process = window.process || { env: {} };
+    </script>
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="index.tsx"></script>
   </body>
 </html>
