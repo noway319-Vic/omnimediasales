@@ -26,20 +26,19 @@
     <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map for Modules -->
+    <!-- Import Map -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+    "react/": "https://aistudiocdn.com/react@^19.2.1/"
   }
 }
 </script>
 
     <style>
-      /* Custom Scrollbar */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
@@ -49,65 +48,58 @@
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
 
-    <!-- Application Script -->
-    <script type="text/babel" data-presets="react,typescript">
+    <!-- Application Script (Converted to pure JS/JSX) -->
+    <!-- CRITICAL FIX: data-type="module" prevents Babel from converting imports to require() -->
+    <script type="text/babel" data-type="module" data-presets="react">
       import React, { useState, useEffect, useContext, createContext } from 'react';
       import ReactDOM from 'react-dom/client';
       import { GoogleGenAI } from "@google/genai";
 
-      // --- 1. TYPES ---
-      enum UserRole {
-        ADMIN = 'ADMIN',
-        USER = 'USER',
-      }
+      // --- 1. CONSTANTS & UTILS ---
+      const UserRole = {
+        ADMIN: 'ADMIN',
+        USER: 'USER',
+      };
 
-      interface User {
-        id: string;
-        username: string;
-        password?: string;
-        role: UserRole;
-        compTimeBalance: number;
-      }
+      const RequestType = {
+        OVERTIME: 'OVERTIME',
+        LEAVE: 'LEAVE',
+      };
 
-      enum RequestType {
-        OVERTIME = 'OVERTIME',
-        LEAVE = 'LEAVE',
-      }
+      const RequestStatus = {
+        PENDING: 'PENDING',
+        APPROVED: 'APPROVED',
+        REJECTED: 'REJECTED',
+      };
 
-      enum RequestStatus {
-        PENDING = 'PENDING',
-        APPROVED = 'APPROVED',
-        REJECTED = 'REJECTED',
-      }
+      const SEED_ADMIN = {
+        id: 'admin-1',
+        username: 'admin',
+        password: 'admin123',
+        role: UserRole.ADMIN,
+        compTimeBalance: 0,
+      };
 
-      interface WorkRequest {
-        id: string;
-        userId: string;
-        username: string;
-        type: RequestType;
-        date: string;
-        startTime: string;
-        hours: number;
-        calculatedHours: number;
-        reason: string;
-        status: RequestStatus;
-        createdAt: string;
-      }
+      // Helper to safely parse JSON
+      const safeJsonParse = (key, fallback) => {
+        try {
+          const item = localStorage.getItem(key);
+          return item ? JSON.parse(item) : fallback;
+        } catch (e) {
+          console.error(`Error parsing ${key}`, e);
+          localStorage.removeItem(key);
+          return fallback;
+        }
+      };
 
-      interface Notification {
-        type: 'success' | 'error' | 'info';
-        message: string;
-      }
-
-      // --- 2. SERVICES ---
+      // --- 2. GEMINI SERVICE ---
       const getAiClient = () => {
         let apiKey = '';
         try {
-          // Check global scope or process.env
           if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             apiKey = process.env.API_KEY;
-          } else if ((window as any).API_KEY) {
-            apiKey = (window as any).API_KEY;
+          } else if (window.API_KEY) {
+            apiKey = window.API_KEY;
           }
         } catch (e) {
           console.warn("API Key check failed", e);
@@ -117,14 +109,14 @@
         return new GoogleGenAI({ apiKey });
       };
 
-      const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): Promise<string> => {
+      const polishReason = async (input, type) => {
         const ai = getAiClient();
         if (!ai) {
             console.warn("API Key missing");
             return input;
         }
 
-        const typeText = type === 'OVERTIME' ? '加班' : '補休';
+        const typeText = type === RequestType.OVERTIME ? '加班' : '補休';
         const prompt = `
           你是一位專業的人資助理。請幫我潤飾以下「${typeText}申請」的原因，使其語氣更專業、簡潔且清晰。
           請使用繁體中文 (Traditional Chinese)。
@@ -148,48 +140,15 @@
       };
 
       // --- 3. CONTEXT ---
-      interface DataContextType {
-        users: User[];
-        currentUser: User | null;
-        requests: WorkRequest[];
-        notification: Notification | null;
-        login: (username: string, password: string) => boolean;
-        logout: () => void;
-        addUser: (user: Omit<User, 'id' | 'compTimeBalance'>) => void;
-        deleteUser: (id: string) => void;
-        updatePassword: (id: string, newPass: string) => void;
-        submitRequest: (req: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username' | 'userId'>) => void;
-        processRequest: (requestId: string, status: RequestStatus.APPROVED | RequestStatus.REJECTED) => void;
-        showNotification: (msg: string, type: 'success' | 'error') => void;
-      }
-
-      const DataContext = createContext<DataContextType | undefined>(undefined);
-
-      const SEED_ADMIN: User = {
-        id: 'admin-1',
-        username: 'admin',
-        password: 'admin123',
-        role: UserRole.ADMIN,
-        compTimeBalance: 0,
-      };
-
-      const safeJsonParse = (key: string, fallback: any) => {
-        try {
-          const item = localStorage.getItem(key);
-          return item ? JSON.parse(item) : fallback;
-        } catch (e) {
-          console.error(`Error parsing ${key}`, e);
-          localStorage.removeItem(key);
-          return fallback;
-        }
-      };
+      const DataContext = createContext();
 
       const DataProvider = ({ children }) => {
-        const [users, setUsers] = useState<User[]>([]);
-        const [requests, setRequests] = useState<WorkRequest[]>([]);
-        const [currentUser, setCurrentUser] = useState<User | null>(null);
-        const [notification, setNotification] = useState<Notification | null>(null);
+        const [users, setUsers] = useState([]);
+        const [requests, setRequests] = useState([]);
+        const [currentUser, setCurrentUser] = useState(null);
+        const [notification, setNotification] = useState(null);
 
+        // Load initial data
         useEffect(() => {
           const loadedUsers = safeJsonParse('app_users', null);
           const loadedRequests = safeJsonParse('app_requests', []);
@@ -206,12 +165,13 @@
           
           if (loadedSession && loadedUsers) {
               const allUsers = loadedUsers || [SEED_ADMIN];
-              const validUser = allUsers.find((u: User) => u.id === loadedSession.id);
+              const validUser = allUsers.find(u => u.id === loadedSession.id);
               if (validUser) setCurrentUser(validUser);
               else localStorage.removeItem('app_session');
           }
         }, []);
 
+        // Persistence
         useEffect(() => {
           if (users.length > 0) localStorage.setItem('app_users', JSON.stringify(users));
         }, [users]);
@@ -232,12 +192,12 @@
           }
         }, [currentUser, users]);
 
-        const showNotification = (message: string, type: 'success' | 'error') => {
+        const showNotification = (message, type) => {
           setNotification({ message, type });
           setTimeout(() => setNotification(null), 3000);
         };
 
-        const login = (username: string, pass: string) => {
+        const login = (username, pass) => {
           const user = users.find(u => u.username === username && u.password === pass);
           if (user) {
             setCurrentUser(user);
@@ -251,34 +211,35 @@
           localStorage.removeItem('app_session');
         };
 
-        const addUser = (userData: Omit<User, 'id' | 'compTimeBalance'>) => {
+        const addUser = (userData) => {
           if (users.some(u => u.username === userData.username)) {
             showNotification('帳號已存在', 'error');
             return;
           }
-          const newUser: User = { ...userData, id: Date.now().toString(), compTimeBalance: 0 };
+          const newUser = { ...userData, id: Date.now().toString(), compTimeBalance: 0 };
           setUsers([...users, newUser]);
           showNotification('成功建立使用者', 'success');
         };
 
-        const deleteUser = (id: string) => {
+        const deleteUser = (id) => {
           setUsers(users.filter(u => u.id !== id));
           showNotification('使用者已刪除', 'success');
         };
 
-        const updatePassword = (id: string, newPass: string) => {
+        const updatePassword = (id, newPass) => {
           setUsers(users.map(u => u.id === id ? { ...u, password: newPass } : u));
           showNotification('密碼更新成功', 'success');
         };
 
-        const submitRequest = (reqData: any) => {
+        const submitRequest = (reqData) => {
           if (!currentUser) return;
 
-          let calculated = reqData.hours;
+          let calculated = parseFloat(reqData.hours);
           if (reqData.type === RequestType.OVERTIME) {
             const day = new Date(reqData.date).getDay();
+            // 0=Sun, 6=Sat
             if (day === 0 || day === 6) {
-              calculated = 8; // Weekend rule: always 8 hours
+              calculated = 8; 
             }
           }
 
@@ -287,8 +248,9 @@
               return;
           }
 
-          const newReq: WorkRequest = {
+          const newReq = {
             ...reqData,
+            hours: parseFloat(reqData.hours),
             id: Date.now().toString(),
             userId: currentUser.id,
             username: currentUser.username,
@@ -301,7 +263,7 @@
           showNotification('申請單已送出', 'success');
         };
 
-        const processRequest = (requestId: string, status: RequestStatus.APPROVED | RequestStatus.REJECTED) => {
+        const processRequest = (requestId, status) => {
           const req = requests.find(r => r.id === requestId);
           if (!req) return;
 
@@ -357,10 +319,19 @@
         return (
           <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-              <div className="text-center mb-8"><h1 className="text-3xl font-extrabold text-slate-800">專案行銷請假系統</h1><p className="text-slate-500 mt-2">高效管理您的加班與補休</p></div>
+              <div className="text-center mb-8">
+                  <h1 className="text-3xl font-extrabold text-slate-800">專案行銷請假系統</h1>
+                  <p className="text-slate-500 mt-2">高效管理您的加班與補休</p>
+              </div>
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">帳號</label><input type="text" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="輸入帳號" /></div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">密碼</label><input type="password" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="輸入密碼" /></div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">帳號</label>
+                    <input type="text" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="輸入帳號" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">密碼</label>
+                    <input type="password" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="輸入密碼" />
+                </div>
                 <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition duration-200">登入</button>
               </form>
               <div className="mt-6 text-center text-xs text-slate-400"><p>預設管理員帳號: admin / admin123</p></div>
@@ -374,42 +345,49 @@
         const { currentUser, logout, notification } = useData();
         if (!currentUser) return <>{children}</>;
         const isAdmin = currentUser.role === UserRole.ADMIN;
+        
         const NavItem = ({ id, label, icon }) => (
           <button onClick={() => setActiveTab(id)} className={`flex items-center space-x-2 px-4 py-3 w-full text-left transition-colors duration-200 ${activeTab === id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            {icon}
+            <span className="text-xl">{icon}</span>
             <span className="font-medium tracking-wide">{label}</span>
           </button>
         );
+
         return (
           <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row font-sans">
             {notification && <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white animate-fade-in-down ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>{notification.message}</div>}
+            
+            {/* Desktop Sidebar */}
             <aside className="hidden md:flex flex-col w-64 bg-white shadow-xl h-screen sticky top-0 z-10">
               <div className="p-6 border-b border-slate-100">
-                <h1 className="text-xl font-bold text-blue-700">專案行銷請假系統</h1>
+                <h1 className="text-xl font-bold text-blue-700">專案行銷</h1>
                 <p className="text-sm text-slate-500 mt-1">你好, {currentUser.username}</p>
                 <div className="mt-2 text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">{isAdmin ? '系統管理員' : `補休餘額: ${currentUser.compTimeBalance}小時`}</div>
               </div>
               <nav className="flex-1 py-4">
-                <NavItem id="dashboard" label="儀表板" icon={<span>📊</span>} />
-                <NavItem id="apply" label="申請加班/補休" icon={<span>📝</span>} />
-                {isAdmin && <NavItem id="admin" label="管理後台" icon={<span>⚙️</span>} />}
-                <NavItem id="settings" label="個人設定" icon={<span>👤</span>} />
+                <NavItem id="dashboard" label="儀表板" icon="📊" />
+                <NavItem id="apply" label="申請加班/補休" icon="📝" />
+                {isAdmin && <NavItem id="admin" label="管理後台" icon="⚙️" />}
+                <NavItem id="settings" label="個人設定" icon="👤" />
               </nav>
               <div className="p-4 border-t border-slate-100"><button onClick={logout} className="flex items-center text-red-600 hover:bg-red-50 px-4 py-2 w-full rounded transition"><span className="mr-2">🚪</span> 登出</button></div>
             </aside>
+
+            {/* Mobile Header */}
             <div className="md:hidden bg-white shadow-md sticky top-0 z-20">
               <div className="flex justify-between items-center p-4">
-                  <div><h1 className="font-bold text-blue-700 text-lg">專案行銷請假系統</h1><span className="text-xs text-gray-500">餘額: {currentUser.compTimeBalance}小時</span></div>
+                  <div><h1 className="font-bold text-blue-700 text-lg">專案行銷系統</h1><span className="text-xs text-gray-500">餘額: {currentUser.compTimeBalance}小時</span></div>
                 <button onClick={() => { const menu = document.getElementById('mobile-menu'); if(menu) menu.classList.toggle('hidden'); }} className="text-slate-600 focus:outline-none text-2xl">☰</button>
               </div>
               <div id="mobile-menu" className="hidden bg-slate-50 border-t border-slate-200">
-                 <NavItem id="dashboard" label="儀表板" icon={<span></span>} />
-                 <NavItem id="apply" label="申請加班/補休" icon={<span></span>} />
-                 {isAdmin && <NavItem id="admin" label="管理後台" icon={<span></span>} />}
-                 <NavItem id="settings" label="個人設定" icon={<span></span>} />
-                 <button onClick={logout} className="block w-full text-left px-8 py-3 text-red-600 font-medium">登出</button>
+                 <NavItem id="dashboard" label="儀表板" icon="📊" />
+                 <NavItem id="apply" label="申請加班/補休" icon="📝" />
+                 {isAdmin && <NavItem id="admin" label="管理後台" icon="⚙️" />}
+                 <NavItem id="settings" label="個人設定" icon="👤" />
+                 <button onClick={logout} className="block w-full text-left px-8 py-3 text-red-600 font-medium border-t border-slate-200">登出</button>
               </div>
             </div>
+
             <main className="flex-1 p-4 md:p-8 overflow-y-auto"><div className="max-w-6xl mx-auto">{children}</div></main>
           </div>
         );
@@ -422,9 +400,11 @@
         const myRequests = requests.filter(r => r.userId === currentUser.id);
         const pendingCount = myRequests.filter(r => r.status === RequestStatus.PENDING).length;
         const approvedCount = myRequests.filter(r => r.status === RequestStatus.APPROVED).length;
+        
         const getStatusColor = (status) => {
           switch (status) { case RequestStatus.APPROVED: return 'bg-green-100 text-green-800'; case RequestStatus.REJECTED: return 'bg-red-100 text-red-800'; default: return 'bg-yellow-100 text-yellow-800'; }
         };
+
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-800">我的儀表板</h2>
@@ -453,7 +433,6 @@
         const [reason, setReason] = useState('');
         const [isPolishing, setIsPolishing] = useState(false);
 
-        // Time Defaults
         useEffect(() => {
           if (date && type === RequestType.OVERTIME) {
             const day = new Date(date).getDay();
@@ -471,6 +450,7 @@
           submitRequest({ type, date, startTime, hours, reason });
           setDate(''); setStartTime(''); setHours(0); setReason('');
         };
+
         const handleAiPolish = async () => {
           if (!reason || reason.length < 2) { showNotification('請先輸入草稿原因', 'error'); return; }
           setIsPolishing(true);
@@ -481,6 +461,7 @@
           } catch (e) { showNotification('潤飾失敗', 'error'); } 
           finally { setIsPolishing(false); }
         };
+
         return (
           <div className="max-w-2xl mx-auto">
             <div className="bg-white rounded-xl shadow-lg border border-slate-100 p-6 md:p-8">
@@ -500,7 +481,7 @@
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-slate-700 mb-1">時數 (小時)</label>
-                   <input type="number" step="0.5" min="0.5" required value={hours || ''} onChange={(e) => setHours(parseFloat(e.target.value))} className="w-full rounded-lg border-slate-300 border p-3 outline-none" />
+                   <input type="number" step="0.5" min="0.5" required value={hours || ''} onChange={(e) => setHours(e.target.value)} className="w-full rounded-lg border-slate-300 border p-3 outline-none" />
                    {type === RequestType.OVERTIME && date && (
                       <p className="text-xs text-blue-600 mt-2 bg-blue-50 p-2 rounded">{new Date(date).getDay() % 6 === 0 ? `假日規則：自動核發 8 小時補休。` : `平日規則：依實際時數核發。`}</p>
                    )}
@@ -526,8 +507,10 @@
         const [newUsername, setNewUsername] = useState('');
         const [newPassword, setNewPassword] = useState('');
         const [newRole, setNewRole] = useState(UserRole.USER);
+        
         if (currentUser?.role !== UserRole.ADMIN) return <div>權限不足</div>;
         const pendingRequests = requests.filter(r => r.status === RequestStatus.PENDING);
+        
         const handleCreateUser = (e) => {
           e.preventDefault();
           if(newUsername && newPassword) {
@@ -535,6 +518,7 @@
               setNewUsername(''); setNewPassword('');
           }
         };
+
         return (
           <div className="space-y-6">
             <div className="flex space-x-4 mb-6">
@@ -588,6 +572,7 @@
         const { currentUser } = useData();
         const [activeTab, setActiveTab] = useState('dashboard');
         if (!currentUser) return <Login />;
+        
         const renderContent = () => {
           switch (activeTab) {
             case 'dashboard': return <Dashboard />;
