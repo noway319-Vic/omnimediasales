@@ -48,14 +48,15 @@
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
 
-    <!-- Application Script (Converted to pure JS/JSX) -->
-    <!-- CRITICAL FIX: data-type="module" prevents Babel from converting imports to require() -->
-    <script type="text/babel" data-type="module" data-presets="react">
+    <!-- Application Script (Pure JS/JSX - No TypeScript) -->
+    <!-- data-type="module" is required for Babel to preserve ES imports -->
+    <script type="text/babel" data-type="module">
       import React, { useState, useEffect, useContext, createContext } from 'react';
       import ReactDOM from 'react-dom/client';
       import { GoogleGenAI } from "@google/genai";
 
       // --- 1. CONSTANTS & UTILS ---
+      // Replaced TS Enums with JS Objects
       const UserRole = {
         ADMIN: 'ADMIN',
         USER: 'USER',
@@ -99,6 +100,7 @@
           if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             apiKey = process.env.API_KEY;
           } else if (window.API_KEY) {
+            // FIXED: Removed (window as any) cast which caused SyntaxError
             apiKey = window.API_KEY;
           }
         } catch (e) {
