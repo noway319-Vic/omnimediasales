@@ -30,8 +30,8 @@
     <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react": "https://esm.sh/react@18.2.0?dev",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?dev",
     "@google/genai": "https://esm.sh/@google/genai",
     "react/": "https://aistudiocdn.com/react@^19.2.1/"
   }
@@ -48,15 +48,44 @@
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
 
-    <!-- Application Script (Pure JS/JSX - No TypeScript) -->
-    <!-- data-type="module" is required for Babel to preserve ES imports -->
+    <!-- Application Script -->
     <script type="text/babel" data-type="module">
       import React, { useState, useEffect, useContext, createContext } from 'react';
       import ReactDOM from 'react-dom/client';
       import { GoogleGenAI } from "@google/genai";
 
+      // --- Error Boundary ---
+      class ErrorBoundary extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = { hasError: false, error: null };
+        }
+
+        static getDerivedStateFromError(error) {
+          return { hasError: true, error };
+        }
+
+        componentDidCatch(error, errorInfo) {
+          console.error("React Error:", error, errorInfo);
+        }
+
+        render() {
+          if (this.state.hasError) {
+            return (
+              <div className="p-8 text-center text-red-600">
+                <h1 className="text-2xl font-bold mb-4">系統發生錯誤</h1>
+                <pre className="bg-red-50 p-4 rounded text-left overflow-auto border border-red-200">
+                  {this.state.error?.toString()}
+                </pre>
+                <button onClick={() => window.location.reload()} className="mt-6 bg-blue-600 text-white px-6 py-2 rounded">重新整理</button>
+              </div>
+            );
+          }
+          return this.props.children;
+        }
+      }
+
       // --- 1. CONSTANTS & UTILS ---
-      // Replaced TS Enums with JS Objects
       const UserRole = {
         ADMIN: 'ADMIN',
         USER: 'USER',
@@ -81,7 +110,6 @@
         compTimeBalance: 0,
       };
 
-      // Helper to safely parse JSON
       const safeJsonParse = (key, fallback) => {
         try {
           const item = localStorage.getItem(key);
@@ -587,7 +615,11 @@
       };
 
       const App = () => (
-        <DataProvider><AppContent /></DataProvider>
+        <DataProvider>
+            <ErrorBoundary>
+                <AppContent />
+            </ErrorBoundary>
+        </DataProvider>
       );
 
       const root = ReactDOM.createRoot(document.getElementById('root'));
