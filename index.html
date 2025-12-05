@@ -32,7 +32,7 @@
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+    "@google/genai": "https://esm.sh/@google/genai",
     "react/": "https://aistudiocdn.com/react@^19.2.1/"
   }
 }
@@ -100,7 +100,6 @@
           if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             apiKey = process.env.API_KEY;
           } else if (window.API_KEY) {
-            // FIXED: Removed (window as any) cast which caused SyntaxError
             apiKey = window.API_KEY;
           }
         } catch (e) {
