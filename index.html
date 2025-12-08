@@ -26,7 +26,7 @@
     <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map -->
+    <!-- Import Map: Removed React 19 to prevent version conflicts -->
     <script type="importmap">
 {
   "imports": {
@@ -110,13 +110,13 @@
         compTimeBalance: 0,
       };
 
+      // Helper to safely parse JSON
       const safeJsonParse = (key, fallback) => {
         try {
           const item = localStorage.getItem(key);
           return item ? JSON.parse(item) : fallback;
         } catch (e) {
           console.error(`Error parsing ${key}`, e);
-          localStorage.removeItem(key);
           return fallback;
         }
       };
@@ -172,42 +172,25 @@
       const DataContext = createContext();
 
       const DataProvider = ({ children }) => {
-        const [users, setUsers] = useState([]);
-        const [requests, setRequests] = useState([]);
-        const [currentUser, setCurrentUser] = useState(null);
+        // Lazy Initialization: Load data immediately when state is initialized
+        const [users, setUsers] = useState(() => {
+            const loaded = safeJsonParse('app_users', null);
+            if (loaded && Array.isArray(loaded) && loaded.length > 0) return loaded;
+            return [SEED_ADMIN];
+        });
+        
+        const [requests, setRequests] = useState(() => safeJsonParse('app_requests', []));
+        
+        const [currentUser, setCurrentUser] = useState(() => {
+            const session = safeJsonParse('app_session', null);
+            return session;
+        });
+        
         const [notification, setNotification] = useState(null);
 
-        // Load initial data
+        // Persistence: Save whenever data changes
         useEffect(() => {
-          const loadedUsers = safeJsonParse('app_users', null);
-          const loadedRequests = safeJsonParse('app_requests', []);
-          const loadedSession = safeJsonParse('app_session', null);
-
-          if (loadedUsers && Array.isArray(loadedUsers) && loadedUsers.length > 0) {
-            setUsers(loadedUsers);
-          } else {
-            setUsers([SEED_ADMIN]);
-            localStorage.setItem('app_users', JSON.stringify([SEED_ADMIN]));
-          }
-
-          if (loadedRequests && Array.isArray(loadedRequests)) setRequests(loadedRequests);
-          
-          // Verify session integrity
-          if (loadedSession && loadedUsers) {
-              const validUser = loadedUsers.find(u => u.id === loadedSession.id);
-              if (validUser) setCurrentUser(validUser);
-              else localStorage.removeItem('app_session');
-          } else if (loadedSession && !loadedUsers) {
-               // Fallback if users empty but session exists (rare)
-               if (loadedSession.id === SEED_ADMIN.id) setCurrentUser(SEED_ADMIN);
-          }
-        }, []);
-
-        // Persistence: Save whenever users change
-        useEffect(() => {
-          if (users.length > 0) {
-              localStorage.setItem('app_users', JSON.stringify(users));
-          }
+          localStorage.setItem('app_users', JSON.stringify(users));
         }, [users]);
 
         useEffect(() => {
@@ -217,7 +200,7 @@
         useEffect(() => {
           if (currentUser) {
               localStorage.setItem('app_session', JSON.stringify(currentUser));
-              // Ensure currentUser balance stays in sync with users array
+              // Sync balance
               const freshUser = users.find(u => u.id === currentUser.id);
               if (freshUser && freshUser.compTimeBalance !== currentUser.compTimeBalance) {
                   setCurrentUser(freshUser);
@@ -233,16 +216,25 @@
         };
 
         const login = (username, pass) => {
-          // Use trim to avoid whitespace issues
           const cleanUser = username.trim();
           const cleanPass = pass.trim();
           
-          const user = users.find(u => u.username === cleanUser && u.password === cleanPass);
-          if (user) {
-            setCurrentUser(user);
-            return true;
+          console.log(`Attempting login for: ${cleanUser}`);
+          
+          const user = users.find(u => u.username === cleanUser);
+          if (!user) {
+              console.warn("User not found in database.");
+              return false;
           }
-          return false;
+          
+          if (user.password === cleanPass) {
+              console.log("Login successful");
+              setCurrentUser(user);
+              return true;
+          } else {
+              console.warn("Password mismatch");
+              return false;
+          }
         };
 
         const logout = () => {
@@ -263,8 +255,10 @@
               compTimeBalance: 0 
           };
           
-          // IMPORTANT: Use functional update to ensure we have the latest users array
-          setUsers(prevUsers => [...prevUsers, newUser]);
+          setUsers(prevUsers => {
+              const updated = [...prevUsers, newUser];
+              return updated;
+          });
           showNotification('成功建立使用者', 'success');
         };
 
@@ -274,7 +268,8 @@
         };
 
         const updatePassword = (id, newPass) => {
-          setUsers(prevUsers => prevUsers.map(u => u.id === id ? { ...u, password: newPass.trim() } : u));
+          const cleanPass = newPass.trim();
+          setUsers(prevUsers => prevUsers.map(u => u.id === id ? { ...u, password: cleanPass } : u));
           showNotification('密碼更新成功', 'success');
         };
 
@@ -326,7 +321,6 @@
                 }
                 newBalance -= req.hours;
               }
-              // Functional update for safety
               setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, compTimeBalance: newBalance } : u));
             }
           }
