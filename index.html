@@ -26,14 +26,14 @@
     <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map: Ensure clean React version -->
+    <!-- Import Map: 使用單一穩定的 React 18 版本 -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0?dev",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?dev",
     "@google/genai": "https://esm.sh/@google/genai",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
@@ -50,7 +50,7 @@
 
     <!-- Application Script -->
     <script type="text/babel" data-type="module">
-      import React, { useState, useEffect, useContext, createContext } from 'react';
+      import React, { useState, useEffect, useContext, createContext, useCallback } from 'react';
       import ReactDOM from 'react-dom/client';
       import { GoogleGenAI } from "@google/genai";
 
@@ -135,7 +135,7 @@
             apiKey = window.API_KEY;
           }
         } catch (e) {
-          // ignore process missing error
+          // ignore
         }
 
         if (!apiKey) return null;
@@ -147,19 +147,11 @@
         if (!ai) return input;
 
         const typeText = type === RequestType.OVERTIME ? '加班' : '補休';
-        const prompt = `
-          你是一位專業的人資助理。請幫我潤飾以下「${typeText}申請」的原因，使其語氣更專業、簡潔且清晰。
-          請使用繁體中文 (Traditional Chinese)。
-          不要捏造事實，僅改善語氣和語法。
-          
-          輸入: "${input}"
-          
-          只需輸出潤飾後的文字。
-        `;
+        const prompt = `你是一位專業的人資助理。請幫我潤飾以下「${typeText}申請」的原因，使其語氣更專業、簡潔且清晰。輸入: "${input}"。只需輸出潤飾後的繁體中文文字。`;
 
         try {
           const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
           });
           return response.text.trim();
@@ -173,16 +165,14 @@
       const DataContext = createContext();
 
       const DataProvider = ({ children }) => {
-        // Robust Initialization: Read from localStorage ONCE at startup
+        // 使用懶加載初始化狀態，確保第一次渲染就能拿到 LocalStorage 的資料
         const [users, setUsers] = useState(() => {
             const loaded = safeJsonParse('app_users', []);
-            let initialUsers = Array.isArray(loaded) ? loaded : [];
+            let initialUsers = Array.isArray(loaded) && loaded.length > 0 ? loaded : [SEED_ADMIN];
             
-            // Critical Fix: Ensure Admin Always Exists if list is empty or admin missing
-            const adminExists = initialUsers.some(u => u.username === 'admin');
-            if (!adminExists) {
-                console.log("Admin not found, seeding...");
-                initialUsers = [...initialUsers, SEED_ADMIN];
+            // 確保 admin 永遠存在
+            if (!initialUsers.some(u => u.username === 'admin')) {
+                initialUsers = [SEED_ADMIN, ...initialUsers];
             }
             return initialUsers;
         });
@@ -190,37 +180,29 @@
         const [requests, setRequests] = useState(() => safeJsonParse('app_requests', []));
         
         const [currentUser, setCurrentUser] = useState(() => {
-            const session = safeJsonParse('app_session', null);
-            return session;
+            return safeJsonParse('app_session', null);
         });
         
         const [notification, setNotification] = useState(null);
 
-        // Persistence: Save to LocalStorage whenever state changes
-        // Using strict dependency arrays to ensure updates are captured
+        // 每當 users 變動，立即保存到 LocalStorage
         useEffect(() => {
-          if (users.length > 0) {
-            localStorage.setItem('app_users', JSON.stringify(users));
-          }
+          localStorage.setItem('app_users', JSON.stringify(users));
         }, [users]);
 
+        // 每當 requests 變動，立即保存到 LocalStorage
         useEffect(() => {
           localStorage.setItem('app_requests', JSON.stringify(requests));
         }, [requests]);
 
+        // 每當 currentUser 變動，保存會話
         useEffect(() => {
           if (currentUser) {
               localStorage.setItem('app_session', JSON.stringify(currentUser));
-              // Ensure session object stays in sync with user database
+              // 同步更新 session 中的使用者資料 (例如餘額)
               const freshUser = users.find(u => u.id === currentUser.id);
-              if (freshUser) {
-                  // Only update if critical fields changed to avoid loops
-                  if(freshUser.compTimeBalance !== currentUser.compTimeBalance || freshUser.role !== currentUser.role) {
-                      setCurrentUser(freshUser);
-                  }
-              } else {
-                  // User deleted
-                  setCurrentUser(null);
+              if (freshUser && (freshUser.compTimeBalance !== currentUser.compTimeBalance || freshUser.password !== currentUser.password)) {
+                  setCurrentUser(freshUser);
               }
           } else {
               localStorage.removeItem('app_session');
@@ -232,19 +214,16 @@
           setTimeout(() => setNotification(null), 3000);
         };
 
-        const login = (username, pass) => {
+        const login = useCallback((username, pass) => {
           const cleanUser = username.trim();
           const cleanPass = pass.trim();
-          
           const user = users.find(u => u.username === cleanUser);
-          if (!user) return false;
-          
-          if (user.password === cleanPass) {
+          if (user && user.password === cleanPass) {
               setCurrentUser(user);
               return true;
           }
           return false;
-        };
+        }, [users]);
 
         const logout = () => {
           setCurrentUser(null);
@@ -263,7 +242,6 @@
               id: Date.now().toString(), 
               compTimeBalance: 0 
           };
-          // Functional update to ensure we have latest state
           setUsers(prev => [...prev, newUser]);
           showNotification('成功建立使用者', 'success');
         };
@@ -351,7 +329,6 @@
 
       // --- 4. COMPONENTS ---
 
-      // Login Component
       const Login = () => {
         const { login } = useData();
         const [username, setUsername] = useState('');
@@ -372,36 +349,32 @@
             <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md border border-slate-200">
               <div className="text-center mb-8">
                   <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">專案行銷請假系統</h1>
-                  <p className="text-slate-500 mt-2">高效管理您的加班與補休</p>
+                  <p className="text-slate-500 mt-2 text-sm">高效管理您的加班與補休紀錄</p>
               </div>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">帳號</label>
-                    <input type="text" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="輸入帳號" />
+                    <label className="block text-sm font-bold text-slate-700 mb-1">帳號</label>
+                    <input type="text" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="輸入您的帳號" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">密碼</label>
-                    <input type="password" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="輸入密碼" />
+                    <label className="block text-sm font-bold text-slate-700 mb-1">密碼</label>
+                    <input type="password" required className="w-full px-4 py-3 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="輸入您的密碼" />
                 </div>
                 
                 {error && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium border border-red-100 flex items-center">
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium border border-red-100 flex items-center animate-fade-in-down">
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
                         {error}
                     </div>
                 )}
 
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition duration-200">登入</button>
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition duration-200">登入系統</button>
               </form>
-              <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                 <p className="text-xs text-slate-400">預設管理員帳號: <span className="font-mono text-slate-600">admin</span> / <span className="font-mono text-slate-600">admin123</span></p>
-              </div>
             </div>
           </div>
         );
       };
 
-      // Layout
       const Layout = ({ children, activeTab, setActiveTab }) => {
         const { currentUser, logout, notification } = useData();
         const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -420,7 +393,6 @@
           <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row font-sans">
             {notification && <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white animate-fade-in-down ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>{notification.message}</div>}
             
-            {/* Desktop Sidebar */}
             <aside className="hidden md:flex flex-col w-72 bg-white shadow-xl h-screen sticky top-0 z-10">
               <div className="p-8 border-b border-slate-100">
                 <h1 className="text-2xl font-bold text-slate-800">專案行銷</h1>
@@ -441,7 +413,6 @@
               <div className="p-6 border-t border-slate-100"><button onClick={logout} className="flex items-center justify-center text-red-600 hover:bg-red-50 px-4 py-3 w-full rounded-lg transition font-medium"><span className="mr-2">🚪</span> 登出系統</button></div>
             </aside>
 
-            {/* Mobile Header */}
             <div className="md:hidden bg-white shadow-md sticky top-0 z-20">
               <div className="flex justify-between items-center p-4">
                   <div><h1 className="font-bold text-slate-800 text-lg">專案行銷系統</h1><span className="text-xs text-gray-500">餘額: {currentUser.compTimeBalance}小時</span></div>
@@ -463,7 +434,6 @@
         );
       };
 
-      // Dashboard
       const Dashboard = () => {
         const { currentUser, requests } = useData();
         if (!currentUser) return null;
@@ -493,28 +463,19 @@
         );
       };
 
-      // RequestForm
       const RequestForm = () => {
         const { submitRequest, showNotification } = useData();
         const [type, setType] = useState(RequestType.OVERTIME);
         const [date, setDate] = useState('');
-        const [startTime, setStartTime] = useState('');
+        const [startTime, setStartTime] = useState('09:00');
         const [hours, setHours] = useState(0);
         const [reason, setReason] = useState('');
         const [isPolishing, setIsPolishing] = useState(false);
-
-        useEffect(() => {
-          if (date) {
-            // Default time set to 09:00 for all days
-            setStartTime('09:00'); 
-          }
-        }, [date]);
 
         const handleDateChange = (e) => {
             const val = e.target.value;
             if (val && type === RequestType.LEAVE) {
                 const day = new Date(val).getDay();
-                // 0 = Sunday, 6 = Saturday
                 if (day === 0 || day === 6) {
                     showNotification('補休僅限平日申請，假日請申請加班。', 'error');
                     setDate('');
@@ -524,26 +485,15 @@
             setDate(val);
         };
 
-        const handleTypeChange = (newType) => {
-            setType(newType);
-            // Re-validate date if switching to LEAVE
-            if (newType === RequestType.LEAVE && date) {
-                const day = new Date(date).getDay();
-                if (day === 0 || day === 6) {
-                    setDate(''); // Clear invalid date
-                }
-            }
-        };
-
         const handleSubmit = (e) => {
           e.preventDefault();
           if (hours <= 0) { showNotification('時數必須大於 0', 'error'); return; }
           submitRequest({ type, date, startTime, hours, reason });
-          setDate(''); setStartTime(''); setHours(0); setReason('');
+          setDate(''); setHours(0); setReason('');
         };
 
         const handleAiPolish = async () => {
-          if (!reason || reason.length < 2) { showNotification('請先輸入草稿原因', 'error'); return; }
+          if (!reason || reason.length < 2) { showNotification('請先輸入原因草稿', 'error'); return; }
           setIsPolishing(true);
           try {
             const polished = await polishReason(reason, type);
@@ -559,8 +509,8 @@
               <h2 className="text-2xl font-bold text-slate-800 mb-8">新增申請單</h2>
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-2 gap-4 p-1 bg-slate-100 rounded-xl">
-                  <button type="button" onClick={() => handleTypeChange(RequestType.OVERTIME)} className={`py-3 px-4 rounded-lg font-bold transition-all ${type === RequestType.OVERTIME ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>申請加班</button>
-                  <button type="button" onClick={() => handleTypeChange(RequestType.LEAVE)} className={`py-3 px-4 rounded-lg font-bold transition-all ${type === RequestType.LEAVE ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>申請補休</button>
+                  <button type="button" onClick={() => setType(RequestType.OVERTIME)} className={`py-3 px-4 rounded-lg font-bold transition-all ${type === RequestType.OVERTIME ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>申請加班</button>
+                  <button type="button" onClick={() => { setType(RequestType.LEAVE); setDate(''); }} className={`py-3 px-4 rounded-lg font-bold transition-all ${type === RequestType.LEAVE ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>申請補休</button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -577,18 +527,12 @@
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-2">時數 (小時)</label>
                    <input type="number" step="0.5" min="0.5" required value={hours || ''} onChange={(e) => setHours(e.target.value)} className="w-full rounded-lg border-slate-300 border p-3 outline-none focus:ring-2 focus:ring-blue-500" />
-                   {type === RequestType.OVERTIME && date && (
-                      <div className="mt-3 bg-blue-50 p-3 rounded-lg text-xs text-blue-700 border border-blue-100">
-                          <span className="font-bold">自動計算規則：</span>
-                          {new Date(date).getDay() % 6 === 0 ? `假日加班一律核發 8 小時補休。` : `平日加班依實際時數核發。`}
-                      </div>
-                   )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">申請原因</label>
                   <div className="relative">
-                      <textarea required rows={4} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="請簡述原因..." className="w-full rounded-lg border-slate-300 border p-3 outline-none pr-12 focus:ring-2 focus:ring-blue-500" />
-                      <button type="button" onClick={handleAiPolish} disabled={isPolishing} className="absolute bottom-4 right-4 p-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full hover:shadow-lg transition disabled:opacity-50 transform hover:scale-105" title="AI 潤飾">{isPolishing ? '...' : '✨'}</button>
+                      <textarea required rows={4} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="請簡述申請原因..." className="w-full rounded-lg border-slate-300 border p-3 outline-none pr-12 focus:ring-2 focus:ring-blue-500" />
+                      <button type="button" onClick={handleAiPolish} disabled={isPolishing} className="absolute bottom-4 right-4 p-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full hover:shadow-lg transition transform hover:scale-105">{isPolishing ? '...' : '✨'}</button>
                   </div>
                 </div>
                 <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition duration-200">送出申請單</button>
@@ -598,7 +542,6 @@
         );
       };
 
-      // AdminPanel
       const AdminPanel = () => {
         const { users, requests, addUser, deleteUser, updatePassword, processRequest, currentUser } = useData();
         const [view, setView] = useState('requests');
@@ -626,13 +569,13 @@
             {view === 'requests' && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                    {pendingRequests.length === 0 ? <div className="p-12 text-center text-slate-400">目前沒有待審核申請。</div> : (
-                       <div className="divide-y divide-slate-100">{pendingRequests.map(req => (<div key={req.id} className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 hover:bg-slate-50"><div><div className="flex items-center space-x-3"><span className="font-bold text-slate-800 text-lg">{req.username}</span><span className={`px-2 py-1 rounded text-xs font-bold ${req.type === RequestType.OVERTIME ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>{req.type === RequestType.OVERTIME ? '加班' : '補休'}</span></div><p className="text-sm text-slate-600 mt-2 font-medium">{req.date} <span className="text-slate-400 mx-1">|</span> {req.startTime} <span className="text-slate-400 mx-1">|</span> 申請 {req.hours}小時 {req.type === RequestType.OVERTIME && req.calculatedHours !== req.hours && <span className="text-blue-600 font-bold ml-1">→ 系統建議 {req.calculatedHours}小時</span>}</p><div className="mt-2 bg-slate-50 p-2 rounded text-sm text-slate-600 border border-slate-100 inline-block max-w-xl">"{req.reason}"</div></div><div className="flex space-x-3"><button onClick={() => processRequest(req.id, RequestStatus.APPROVED)} className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-bold transition shadow-sm">核准</button><button onClick={() => processRequest(req.id, RequestStatus.REJECTED)} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-bold transition shadow-sm">拒絕</button></div></div>))}</div>
+                       <div className="divide-y divide-slate-100">{pendingRequests.map(req => (<div key={req.id} className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 hover:bg-slate-50"><div><div className="flex items-center space-x-3"><span className="font-bold text-slate-800 text-lg">{req.username}</span><span className={`px-2 py-1 rounded text-xs font-bold ${req.type === RequestType.OVERTIME ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>{req.type === RequestType.OVERTIME ? '加班' : '補休'}</span></div><p className="text-sm text-slate-600 mt-2 font-medium">{req.date} <span className="text-slate-400 mx-1">|</span> {req.startTime} <span className="text-slate-400 mx-1">|</span> 申請 {req.hours}小時</p><div className="mt-2 bg-slate-50 p-2 rounded text-sm text-slate-600 border border-slate-100 inline-block max-w-xl italic">"{req.reason}"</div></div><div className="flex space-x-3"><button onClick={() => processRequest(req.id, RequestStatus.APPROVED)} className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition">核准</button><button onClick={() => processRequest(req.id, RequestStatus.REJECTED)} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition">拒絕</button></div></div>))}</div>
                    )}
               </div>
             )}
             {view === 'users' && (
               <div className="space-y-8">
-                  <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100"><h3 className="text-lg font-bold text-slate-800 mb-6">建立新帳號</h3><form onSubmit={handleCreateUser} className="flex flex-col md:flex-row gap-4 items-end"><div className="flex-1 w-full"><label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">帳號</label><input value={newUsername} onChange={e => setNewUsername(e.target.value)} required className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="User123" /></div><div className="flex-1 w-full"><label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">密碼</label><input value={newPassword} onChange={e => setNewPassword(e.target.value)} required type="password" className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="******" /></div><div className="w-full md:w-48"><label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">權限</label><select value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg bg-white outline-none"><option value={UserRole.USER}>一般用戶</option><option value={UserRole.ADMIN}>管理員</option></select></div><button type="submit" className="w-full md:w-auto bg-slate-900 text-white px-8 py-3 rounded-lg font-bold hover:bg-slate-800 transition">新增</button></form></div>
+                  <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100"><h3 className="text-lg font-bold text-slate-800 mb-6">建立新帳號</h3><form onSubmit={handleCreateUser} className="flex flex-col md:flex-row gap-4 items-end"><div className="flex-1 w-full"><label className="block text-xs font-bold text-slate-500 mb-2 uppercase">帳號</label><input value={newUsername} onChange={e => setNewUsername(e.target.value)} required className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="輸入新帳號" /></div><div className="flex-1 w-full"><label className="block text-xs font-bold text-slate-500 mb-2 uppercase">密碼</label><input value={newPassword} onChange={e => setNewPassword(e.target.value)} required type="password" className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="設定密碼" /></div><div className="w-full md:w-48"><label className="block text-xs font-bold text-slate-500 mb-2 uppercase">權限</label><select value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg bg-white outline-none"><option value={UserRole.USER}>一般用戶</option><option value={UserRole.ADMIN}>管理員</option></select></div><button type="submit" className="w-full md:w-auto bg-slate-900 text-white px-8 py-3 rounded-lg font-bold hover:bg-slate-800 transition">新增</button></form></div>
                   <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden"><table className="w-full text-left text-sm text-slate-600"><thead className="bg-slate-50 border-b border-slate-200"><tr><th className="px-6 py-4 font-bold text-slate-700">帳號</th><th className="px-6 py-4 font-bold text-slate-700">角色</th><th className="px-6 py-4 font-bold text-slate-700">餘額</th><th className="px-6 py-4 text-right font-bold text-slate-700">操作</th></tr></thead><tbody className="divide-y divide-slate-100">{users.map(u => (<tr key={u.id} className="hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-800">{u.username}</td><td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded font-bold ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{u.role === UserRole.ADMIN ? '管理員' : '一般用戶'}</span></td><td className="px-6 py-4 font-mono">{u.compTimeBalance} hr</td><td className="px-6 py-4 text-right space-x-4"><button onClick={() => { const newP = prompt('請輸入新密碼:'); if(newP) updatePassword(u.id, newP); }} className="text-blue-600 hover:text-blue-800 font-medium">重設密碼</button>{u.id !== currentUser.id && <button onClick={() => { if(confirm('確定要刪除?')) deleteUser(u.id); }} className="text-red-500 hover:text-red-700 font-medium">刪除</button>}</td></tr>))}</tbody></table></div>
               </div>
             )}
@@ -640,7 +583,6 @@
         );
       };
 
-      // Settings
       const Settings = () => {
         const { currentUser, updatePassword, showNotification } = useData();
         const [password, setPassword] = useState('');
@@ -657,7 +599,7 @@
               <h2 className="text-xl font-bold text-slate-800 mb-6">帳號安全設定</h2>
               <form onSubmit={handleUpdate} className="space-y-6">
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">新密碼</label><input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入新密碼" /></div>
-                <div><label className="block text-sm font-bold text-slate-700 mb-2">確認新密碼</label><input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="再次輸入" /></div>
+                <div><label className="block text-sm font-bold text-slate-700 mb-2">確認新密碼</label><input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="再次輸入新密碼" /></div>
                 <button className="w-full bg-slate-900 text-white py-4 rounded-lg font-bold hover:bg-slate-800 transition">更新密碼</button>
               </form>
             </div>
@@ -665,22 +607,11 @@
         );
       };
 
-      // --- 5. MAIN APP ---
       const AppContent = () => {
         const { currentUser } = useData();
         const [activeTab, setActiveTab] = useState('dashboard');
         if (!currentUser) return <Login />;
-        
-        const renderContent = () => {
-          switch (activeTab) {
-            case 'dashboard': return <Dashboard />;
-            case 'apply': return <RequestForm />;
-            case 'admin': return <AdminPanel />;
-            case 'settings': return <Settings />;
-            default: return <Dashboard />;
-          }
-        };
-        return <Layout activeTab={activeTab} setActiveTab={setActiveTab}>{renderContent()}</Layout>;
+        return <Layout activeTab={activeTab} setActiveTab={setActiveTab}>{activeTab === 'dashboard' ? <Dashboard /> : activeTab === 'apply' ? <RequestForm /> : activeTab === 'admin' ? <AdminPanel /> : <Settings />}</Layout>;
       };
 
       const App = () => (
