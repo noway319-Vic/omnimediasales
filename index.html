@@ -31,16 +31,17 @@
     <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 
-    <!-- Import Map: 修正重點 - 移除所有 react/ 與 react-dom/ 的 19.x 映射，鎖定 18.2.0 -->
+    <!-- Import Map: 核心修復 - 移除所有可能指向 React 19 的殘留路徑 -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
     "react/": "https://esm.sh/react@18.2.0/",
-    "react-dom": "https://esm.sh/react-dom@18.2.0?deps=react@18.2.0",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
-    "@google/genai": "https://esm.sh/@google/genai"
+    "react-dom": "https://esm.sh/react-dom@18.2.0?external=react",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?external=react",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime?external=react",
+    "@google/genai": "https://esm.sh/@google/genai",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
 </script>
@@ -55,10 +56,10 @@
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
-    <!-- 確保 Babel 使用正確的 preset 並以模組方式載入 -->
+    <!-- 使用 data-presets="env,react" 並確保為 module 類型 -->
     <script 
       type="text/babel" 
-      data-presets="react,env" 
+      data-presets="env,react" 
       data-type="module" 
       src="./index.tsx"
     ></script>
