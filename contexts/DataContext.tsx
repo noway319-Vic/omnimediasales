@@ -39,7 +39,6 @@ const safeJsonParse = (key: string, fallback: any) => {
 };
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // 使用延遲初始化 (Lazy Initializer) 確保在渲染前就同步讀取 localStorage
   const [users, setUsers] = useState<User[]>(() => {
     const loaded = safeJsonParse('app_users', []);
     let list = Array.isArray(loaded) && loaded.length > 0 ? loaded : [SEED_ADMIN];
@@ -50,7 +49,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   const [requests, setRequests] = useState<WorkRequest[]>(() => {
-    return safeJsonParse('app_requests', []);
+    const loaded = safeJsonParse('app_requests', []);
+    return Array.isArray(loaded) ? loaded : [];
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -59,7 +59,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [notification, setNotification] = useState<Notification | null>(null);
 
-  // 監聽狀態變更並寫入 localStorage
   useEffect(() => {
     localStorage.setItem('app_users', JSON.stringify(users));
   }, [users]);
@@ -71,15 +70,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('app_session', JSON.stringify(currentUser));
-      // 同步更新 session 中的使用者狀態
+      // 同步最新使用者資料至 session
       const freshUser = users.find(u => u.id === currentUser.id);
-      if (freshUser && (freshUser.compTimeBalance !== currentUser.compTimeBalance || freshUser.password !== currentUser.password)) {
+      if (freshUser && JSON.stringify(freshUser) !== JSON.stringify(currentUser)) {
         setCurrentUser(freshUser);
       }
     } else {
       localStorage.removeItem('app_session');
     }
-  }, [currentUser, users]);
+  }, [users, currentUser]);
 
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type });
@@ -97,7 +96,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('app_session');
   };
 
   const addUser = (userData: Omit<User, 'id' | 'compTimeBalance'>) => {
@@ -111,17 +109,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       compTimeBalance: 0,
     };
     setUsers(prev => [...prev, newUser]);
-    showNotification('成功建立使用者並儲存', 'success');
+    showNotification('成功建立使用者', 'success');
   };
 
   const deleteUser = (id: string) => {
     setUsers(prev => prev.filter(u => u.id !== id));
+    if (currentUser?.id === id) logout();
     showNotification('使用者已刪除', 'success');
   };
 
   const updatePassword = (id: string, newPass: string) => {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, password: newPass.trim() } : u));
-    showNotification('密碼更新成功並儲存', 'success');
+    showNotification('密碼更新成功', 'success');
   };
 
   const submitRequest = (reqData: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username' | 'userId'>) => {
@@ -176,8 +175,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r));
-    const statusText = status === RequestStatus.APPROVED ? '核准' : '拒絕';
-    showNotification(`已${statusText}該申請`, 'success');
+    showNotification(`已${status === RequestStatus.APPROVED ? '核准' : '拒絕'}該申請`, 'success');
   };
 
   return (

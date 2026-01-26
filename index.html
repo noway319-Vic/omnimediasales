@@ -26,7 +26,7 @@
     <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map: 確保嚴格使用 React 18.2.0，移除任何導致版本衝突的 19.x 路徑 -->
+    <!-- Import Map: 統一鎖定 React 18.2.0 版本，避免版本混合導致的 $$typeof 識別失敗 -->
     <script type="importmap">
 {
   "imports": {
