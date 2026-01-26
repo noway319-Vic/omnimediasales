@@ -11,7 +11,6 @@ interface DataContextType {
   addUser: (user: Omit<User, 'id' | 'compTimeBalance'>) => void;
   deleteUser: (id: string) => void;
   updatePassword: (id: string, newPass: string) => void;
-  // Added userId to Omit list as it is derived from currentUser
   submitRequest: (req: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username' | 'userId'>) => void;
   processRequest: (requestId: string, status: RequestStatus.APPROVED | RequestStatus.REJECTED) => void;
   showNotification: (msg: string, type: 'success' | 'error') => void;
@@ -27,59 +26,42 @@ const SEED_ADMIN: User = {
   compTimeBalance: 0,
 };
 
-// Helper to safely parse JSON
 const safeJsonParse = (key: string, fallback: any) => {
   try {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : fallback;
+    if (!item) return fallback;
+    const parsed = JSON.parse(item);
+    return parsed || fallback;
   } catch (e) {
     console.error(`Error parsing ${key} from localStorage`, e);
-    // If error, clear the corrupted data to prevent future crashes
-    localStorage.removeItem(key);
     return fallback;
   }
 };
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [requests, setRequests] = useState<WorkRequest[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // 使用延遲初始化 (Lazy Initializer) 確保在渲染前就同步讀取 localStorage
+  const [users, setUsers] = useState<User[]>(() => {
+    const loaded = safeJsonParse('app_users', []);
+    let list = Array.isArray(loaded) && loaded.length > 0 ? loaded : [SEED_ADMIN];
+    if (!list.some(u => u.username === 'admin')) {
+      list = [SEED_ADMIN, ...list];
+    }
+    return list;
+  });
+
+  const [requests, setRequests] = useState<WorkRequest[]>(() => {
+    return safeJsonParse('app_requests', []);
+  });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    return safeJsonParse('app_session', null);
+  });
+
   const [notification, setNotification] = useState<Notification | null>(null);
 
-  // Load initial data
+  // 監聽狀態變更並寫入 localStorage
   useEffect(() => {
-    const loadedUsers = safeJsonParse('app_users', null);
-    const loadedRequests = safeJsonParse('app_requests', []);
-    const loadedSession = safeJsonParse('app_session', null);
-
-    if (loadedUsers && Array.isArray(loadedUsers) && loadedUsers.length > 0) {
-      setUsers(loadedUsers);
-    } else {
-      setUsers([SEED_ADMIN]);
-      localStorage.setItem('app_users', JSON.stringify([SEED_ADMIN]));
-    }
-
-    if (loadedRequests && Array.isArray(loadedRequests)) {
-      setRequests(loadedRequests);
-    }
-    
-    if (loadedSession && loadedUsers) {
-        // Validate session against current users
-        const allUsers = loadedUsers || [SEED_ADMIN];
-        const validUser = allUsers.find((u: User) => u.id === loadedSession.id);
-        if (validUser) {
-            setCurrentUser(validUser);
-        } else {
-            localStorage.removeItem('app_session');
-        }
-    }
-  }, []);
-
-  // Sync to local storage
-  useEffect(() => {
-    if (users.length > 0) {
-        localStorage.setItem('app_users', JSON.stringify(users));
-    }
+    localStorage.setItem('app_users', JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
@@ -88,14 +70,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (currentUser) {
-        localStorage.setItem('app_session', JSON.stringify(currentUser));
-        // Update current user ref from users array to keep balance in sync
-        const freshUser = users.find(u => u.id === currentUser.id);
-        if (freshUser && freshUser.compTimeBalance !== currentUser.compTimeBalance) {
-            setCurrentUser(freshUser);
-        }
+      localStorage.setItem('app_session', JSON.stringify(currentUser));
+      // 同步更新 session 中的使用者狀態
+      const freshUser = users.find(u => u.id === currentUser.id);
+      if (freshUser && (freshUser.compTimeBalance !== currentUser.compTimeBalance || freshUser.password !== currentUser.password)) {
+        setCurrentUser(freshUser);
+      }
     } else {
-        localStorage.removeItem('app_session');
+      localStorage.removeItem('app_session');
     }
   }, [currentUser, users]);
 
@@ -105,7 +87,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const login = (username: string, pass: string) => {
-    const user = users.find(u => u.username === username && u.password === pass);
+    const user = users.find(u => u.username === username.trim() && u.password === pass.trim());
     if (user) {
       setCurrentUser(user);
       return true;
@@ -128,31 +110,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       id: Date.now().toString(),
       compTimeBalance: 0,
     };
-    setUsers([...users, newUser]);
-    showNotification('成功建立使用者', 'success');
+    setUsers(prev => [...prev, newUser]);
+    showNotification('成功建立使用者並儲存', 'success');
   };
 
   const deleteUser = (id: string) => {
-    setUsers(users.filter(u => u.id !== id));
+    setUsers(prev => prev.filter(u => u.id !== id));
     showNotification('使用者已刪除', 'success');
   };
 
   const updatePassword = (id: string, newPass: string) => {
-    setUsers(users.map(u => u.id === id ? { ...u, password: newPass } : u));
-    showNotification('密碼更新成功', 'success');
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, password: newPass.trim() } : u));
+    showNotification('密碼更新成功並儲存', 'success');
   };
 
-  // Added userId to Omit list
   const submitRequest = (reqData: Omit<WorkRequest, 'id' | 'status' | 'calculatedHours' | 'createdAt' | 'username' | 'userId'>) => {
     if (!currentUser) return;
 
-    // Business Logic: Weekend Rule
     let calculated = reqData.hours;
     if (reqData.type === RequestType.OVERTIME) {
       const day = new Date(reqData.date).getDay();
-      // 0 is Sunday, 6 is Saturday
       if (day === 0 || day === 6) {
-        calculated = 8; // Fixed 8 hours for weekends
+        calculated = 8; 
       }
     }
 
@@ -171,7 +150,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       createdAt: new Date().toISOString(),
     };
 
-    setRequests([newReq, ...requests]);
+    setRequests(prev => [newReq, ...prev]);
     showNotification('申請單已送出', 'success');
   };
 
@@ -180,26 +159,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!req) return;
 
     if (status === RequestStatus.APPROVED) {
-      // Modify User Balance
       const targetUser = users.find(u => u.id === req.userId);
       if (targetUser) {
         let newBalance = targetUser.compTimeBalance;
         if (req.type === RequestType.OVERTIME) {
           newBalance += req.calculatedHours;
         } else {
-          // Double check balance
           if (newBalance < req.hours) {
             showNotification('用戶餘額不足，無法核准', 'error');
             return;
           }
           newBalance -= req.hours;
         }
-
-        setUsers(users.map(u => u.id === targetUser.id ? { ...u, compTimeBalance: newBalance } : u));
+        setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, compTimeBalance: newBalance } : u));
       }
     }
 
-    setRequests(requests.map(r => r.id === requestId ? { ...r, status } : r));
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r));
     const statusText = status === RequestStatus.APPROVED ? '核准' : '拒絕';
     showNotification(`已${statusText}該申請`, 'success');
   };

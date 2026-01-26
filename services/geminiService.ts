@@ -1,27 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 
-const getAiClient = () => {
-  let apiKey = '';
-  try {
-    // Robust check for process.env
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      apiKey = process.env.API_KEY;
-    }
-  } catch (e) {
-    console.warn("Could not access process.env", e);
-  }
-
-  if (!apiKey) return null;
-  return new GoogleGenAI({ apiKey });
-};
-
 export const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): Promise<string> => {
-  const ai = getAiClient();
-  if (!ai) {
-      console.warn("API Key missing or client not initialized");
-      return input;
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API Key missing");
+    return input;
   }
 
+  const ai = new GoogleGenAI({ apiKey });
   const typeText = type === 'OVERTIME' ? '加班' : '補休';
 
   const prompt = `
@@ -36,12 +22,12 @@ export const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): P
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    return response.text.trim();
+    return response.text ? response.text.trim() : input;
   } catch (error) {
     console.error("Gemini Error:", error);
-    return input; // Fallback to original
+    return input;
   }
 };

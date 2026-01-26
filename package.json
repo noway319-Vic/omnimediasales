@@ -1,5 +1,5 @@
 {
-  "name": "專案行銷請假系統",
+  "name": "專案行銷加班補休系統",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.3",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
     "@google/genai": "latest"
   },
   "devDependencies": {

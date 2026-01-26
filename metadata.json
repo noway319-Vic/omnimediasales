@@ -1,5 +1,5 @@
 {
-  "name": "專案行銷請假系統",
+  "name": "專案行銷加班補休系統",
   "description": "響應式加班與補休管理系統，包含自動補休計算規則與 AI 輔助潤飾功能。",
   "requestFramePermissions": []
 }
