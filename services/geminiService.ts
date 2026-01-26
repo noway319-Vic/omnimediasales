@@ -1,9 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): Promise<string> => {
-  const apiKey = process.env.API_KEY;
+  // 安全取得 API Key
+  const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
+  
   if (!apiKey) {
-    console.warn("API Key missing");
+    console.warn(" Gemini API Key is not available in process.env");
     return input;
   }
 
@@ -17,7 +19,7 @@ export const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): P
     
     輸入: "${input}"
     
-    只需輸出潤飾後的文字。
+    只需輸出潤飾後的文字，不要包含任何解釋。
   `;
 
   try {
@@ -27,7 +29,7 @@ export const polishReason = async (input: string, type: 'OVERTIME' | 'LEAVE'): P
     });
     return response.text ? response.text.trim() : input;
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini AI Error:", error);
     return input;
   }
 };
