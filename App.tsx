@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { DataProvider, useData } from './contexts/DataContext';
-import Login from './components/Login';
-import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import RequestForm from './components/RequestForm';
-import AdminPanel from './components/AdminPanel';
-import Settings from './components/Settings';
+import { DataProvider, useData } from './contexts/DataContext.tsx';
+import Login from './components/Login.tsx';
+import Layout from './components/Layout.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import RequestForm from './components/RequestForm.tsx';
+import AdminPanel from './components/AdminPanel.tsx';
+import Settings from './components/Settings.tsx';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useData();

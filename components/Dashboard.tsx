@@ -1,13 +1,12 @@
 import React from 'react';
-import { useData } from '../contexts/DataContext';
-import { RequestStatus, RequestType } from '../types';
+import { useData } from '../contexts/DataContext.tsx';
+import { RequestStatus, RequestType } from '../types.ts';
 
 const Dashboard: React.FC = () => {
   const { currentUser, requests } = useData();
 
   if (!currentUser) return null;
 
-  // Filter requests relevant to view
   const myRequests = requests.filter(r => r.userId === currentUser.id);
   const pendingCount = myRequests.filter(r => r.status === RequestStatus.PENDING).length;
   const approvedCount = myRequests.filter(r => r.status === RequestStatus.APPROVED).length;
@@ -33,7 +32,6 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-800">我的儀表板</h2>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
           <p className="text-sm font-medium text-slate-500">目前補休餘額</p>
@@ -49,7 +47,6 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Request History */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h3 className="text-lg font-semibold text-slate-800">近期活動紀錄</h3>

@@ -1,6 +1,6 @@
 import React from 'react';
-import { useData } from '../contexts/DataContext';
-import { UserRole } from '../types';
+import { useData } from '../contexts/DataContext.tsx';
+import { UserRole } from '../types.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,7 +31,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row font-sans">
-      {/* Toast Notification */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white animate-fade-in-down ${
           notification.type === 'error' ? 'bg-red-500' : 'bg-green-600'
@@ -40,7 +39,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </div>
       )}
 
-      {/* Sidebar (Desktop) */}
       <aside className="hidden md:flex flex-col w-64 bg-white shadow-xl h-screen sticky top-0 z-10">
         <div className="p-6 border-b border-slate-100">
           <h1 className="text-xl font-bold text-blue-700 leading-tight">專案行銷<br/>加班補休系統</h1>
@@ -65,7 +63,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </div>
       </aside>
 
-      {/* Mobile Navbar */}
       <div className="md:hidden bg-white shadow-md sticky top-0 z-20">
         <div className="flex justify-between items-center p-4">
             <div>
@@ -89,7 +86,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           {children}

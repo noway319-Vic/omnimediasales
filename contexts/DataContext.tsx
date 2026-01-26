@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, WorkRequest, UserRole, RequestType, RequestStatus, Notification } from '../types';
+import { User, WorkRequest, UserRole, RequestType, RequestStatus, Notification } from '../types.ts';
 
 interface DataContextType {
   users: User[];
@@ -70,7 +70,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('app_session', JSON.stringify(currentUser));
-      // 同步最新使用者資料至 session
       const freshUser = users.find(u => u.id === currentUser.id);
       if (freshUser && JSON.stringify(freshUser) !== JSON.stringify(currentUser)) {
         setCurrentUser(freshUser);

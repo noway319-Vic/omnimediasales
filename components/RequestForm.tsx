@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useData } from '../contexts/DataContext';
-import { RequestType } from '../types';
-import { polishReason } from '../services/geminiService';
+import { useData } from '../contexts/DataContext.tsx';
+import { RequestType } from '../types.ts';
+import { polishReason } from '../services/geminiService.ts';
 
 const RequestForm: React.FC = () => {
   const { submitRequest, showNotification } = useData();
@@ -12,15 +12,13 @@ const RequestForm: React.FC = () => {
   const [reason, setReason] = useState('');
   const [isPolishing, setIsPolishing] = useState(false);
 
-  // Auto-set start time based on date (Weekend vs Weekday)
   useEffect(() => {
     if (date && type === RequestType.OVERTIME) {
       const day = new Date(date).getDay();
-      // 0 is Sunday, 6 is Saturday
       if (day === 0 || day === 6) {
-        setStartTime('08:00'); // Weekend default 8 AM
+        setStartTime('08:00');
       } else {
-        setStartTime('20:00'); // Weekday default 8 PM
+        setStartTime('20:00');
       }
     }
   }, [date, type]);
@@ -32,7 +30,6 @@ const RequestForm: React.FC = () => {
         return;
     }
     submitRequest({ type, date, startTime, hours, reason });
-    // Reset form
     setDate('');
     setStartTime('');
     setHours(0);
@@ -44,8 +41,9 @@ const RequestForm: React.FC = () => {
       showNotification('請先輸入草稿原因', 'error');
       return;
     }
-    if (!process.env.API_KEY) {
-        showNotification('未設定 Gemini API Key', 'error');
+    const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
+    if (!apiKey) {
+        showNotification('未偵測到 API Key', 'error');
         return;
     }
     setIsPolishing(true);
@@ -66,7 +64,6 @@ const RequestForm: React.FC = () => {
         <h2 className="text-2xl font-bold text-slate-800 mb-6">新增申請單</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Type Selection */}
           <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
@@ -169,7 +166,7 @@ const RequestForm: React.FC = () => {
                     )}
                 </button>
             </div>
-            <p className="text-xs text-slate-400 mt-1">小撇步：點擊閃電圖示，讓 AI 幫您把原因寫得更專業。</p>
+            <p className="text-xs text-slate-400 mt-1">點擊閃電圖示，讓 AI 幫您潤飾內容。</p>
           </div>
 
           <button

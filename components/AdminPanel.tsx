@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { useData } from '../contexts/DataContext';
-import { RequestStatus, RequestType, UserRole } from '../types';
+import { useData } from '../contexts/DataContext.tsx';
+import { RequestStatus, RequestType, UserRole } from '../types.ts';
 
 const AdminPanel: React.FC = () => {
   const { users, requests, addUser, deleteUser, updatePassword, processRequest, currentUser } = useData();
   const [view, setView] = useState<'users' | 'requests'>('requests');
 
-  // User Form State
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<UserRole>(UserRole.USER);
@@ -59,7 +58,7 @@ const AdminPanel: React.FC = () => {
                                  <p className="text-sm text-slate-600 mt-1">
                                      {req.date} @ {req.startTime} • 申請 {req.hours}小時
                                      {req.type === RequestType.OVERTIME && req.calculatedHours !== req.hours && (
-                                         <span className="text-blue-600 font-bold ml-1">→ 實際核發 {req.calculatedHours}小時 (假日規則)</span>
+                                         <span className="text-blue-600 font-bold ml-1">→ 實際核發 {req.calculatedHours}小時</span>
                                      )}
                                  </p>
                                  <p className="text-sm text-slate-500 italic mt-1">"{req.reason}"</p>
@@ -87,7 +86,6 @@ const AdminPanel: React.FC = () => {
 
       {view === 'users' && (
         <div className="space-y-8">
-            {/* Create User */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">建立新帳號</h3>
                 <form onSubmit={handleCreateUser} className="flex flex-col md:flex-row gap-4 items-end">
@@ -110,7 +108,6 @@ const AdminPanel: React.FC = () => {
                 </form>
             </div>
 
-            {/* List Users */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                 <table className="w-full text-left text-sm text-slate-600">
                     <thead className="bg-slate-50">

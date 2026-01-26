@@ -23,7 +23,7 @@
       }
     </script>
 
-    <!-- Shim for process.env - 防止在模組加載時因找不到 process 而崩潰 -->
+    <!-- Shim for process.env -->
     <script>
       window.process = window.process || { env: { NODE_ENV: 'production' } };
     </script>
@@ -31,7 +31,7 @@
     <!-- Babel for in-browser JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map: 核心修正 - 移除所有 React 19 參照，確保全域僅有一份 React 18.2.0 實體 -->
+    <!-- Import Map: 核心修正 - 移除所有 React 19 參照，並確保所有路徑都指向同一個 18.2.0 實體 -->
     <script type="importmap">
 {
   "imports": {
@@ -54,7 +54,6 @@
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
-    <!-- 使用 data-type="module" 以配合 Import Map 並讓 Babel 處理模組化 JSX -->
     <script type="text/babel" src="index.tsx" data-type="module"></script>
   </body>
 </html>

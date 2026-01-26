@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useData } from '../contexts/DataContext';
+import { useData } from '../contexts/DataContext.tsx';
 
 const Settings: React.FC = () => {
   const { currentUser, updatePassword, showNotification } = useData();

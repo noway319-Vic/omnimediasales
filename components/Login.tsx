@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useData } from '../contexts/DataContext';
+import { useData } from '../contexts/DataContext.tsx';
 
 const Login: React.FC = () => {
   const { login, showNotification } = useData();
