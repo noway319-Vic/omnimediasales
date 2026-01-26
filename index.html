@@ -28,20 +28,20 @@
       window.process = window.process || { env: { NODE_ENV: 'production' } };
     </script>
 
-    <!-- Babel for in-browser JSX compilation -->
+    <!-- Babel for in-browser JSX/TSX compilation -->
     <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 
-    <!-- Import Map: 核心修復 - 移除所有可能指向 React 19 的殘留路徑 -->
+    <!-- Import Map: 嚴格鎖定版本，移除任何可能導致 React 19 混入的路徑 -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
-    "react/": "https://esm.sh/react@18.2.0/",
-    "react-dom": "https://esm.sh/react-dom@18.2.0?external=react",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?external=react",
-    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime?external=react",
+    "react-dom": "https://esm.sh/react-dom@18.2.0?deps=react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
     "@google/genai": "https://esm.sh/@google/genai",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
@@ -56,10 +56,10 @@
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
-    <!-- 使用 data-presets="env,react" 並確保為 module 類型 -->
+    <!-- 加入 typescript 預設以支援 .tsx 語法 -->
     <script 
       type="text/babel" 
-      data-presets="env,react" 
+      data-presets="env,react,typescript" 
       data-type="module" 
       src="./index.tsx"
     ></script>
